@@ -2,249 +2,322 @@
 
 시민 참여 기반 교통약자 안전 경로 추천 플랫폼
 
-“이동 가능”이 아닌 “안전 이동 가능”을 기준으로 경로를 설계하는 데이터 기반 보행 지원 시스템
+SafeWalk는 **교통약자의 보행 안전을 고려한 경로 추천 시스템**이다.
+기존 지도 서비스가 최단거리 중심 경로를 제공하는 것과 달리,
+
+> SafeWalk는 **위험 점수 기반 안전 경로 탐색**을 제공한다.
+
+사용자는 시민 신고 데이터, 경사도 정보, 시설 상태 데이터를 기반으로
+**안전 점수가 가장 낮은 경로**를 추천받을 수 있다.
 
 ---
 
-## 1. Problem Definition
+# Features
 
-현행 지도 서비스는 최단거리 또는 최소시간 중심의 경로를 제공한다.
-그러나 휠체어 이용자, 노약자, 임산부, 유모차 사용자 등 교통약자에게는 다음 요소가 실질적인 위험 요인이 된다.
+### 안전 경로 추천
 
-* 급경사
+경사도, 장애물, 시설 상태, 시민 신고 데이터를 기반으로
+**구간 단위 위험 점수(Segment Score)** 를 계산하고
+**최안전 경로**를 추천한다.
+
+### 시민 참여 위험 데이터 수집
+
+사용자는 다음 위험 요소를 직접 신고할 수 있다.
+
 * 보도블록 파손
 * 단차
+* 불법 주정차
 * 엘리베이터 고장
-* 불법 주정차로 인한 보행 방해
+* 급경사 구간
 
-즉, 이동은 가능하지만 안전은 보장되지 않는 구조이다.
-
-### 핵심 문제
-
-1. 보행 위험 정보의 구조화된 데이터 부재
-2. 교통약자 맞춤 경로 제공 서비스 부족
-3. 위험 구간 정보의 비실시간성
-4. 시민 신고 데이터의 체계적 활용 부재
+신고 데이터는 자동으로 도로 세그먼트에 매핑된다.
 
 ---
 
-## 2. Solution Overview
+### 경사 기반 위험 분석
 
-SafeWalk는 다음 세 가지를 중심으로 설계되었다.
-
-1. 시민 참여 기반 위험 데이터 수집
-2. 구간 단위 위험 점수화 모델 설계
-3. 안전 점수 기반 경로 추천 알고리즘 구현
-
-이를 통해 기존 지도 서비스의 한계를 보완하고 교통약자를 위한 안전 중심 경로 탐색을 지원한다.
+DEM(수치표고모델)을 활용하여 도로 구간의 **경사도를 계산**하고
+교통약자 이동에 위험한 경로를 점수에 반영한다.
 
 ---
 
-## 3. System Architecture
+### 실시간 위험 반영
+
+새로운 신고가 들어오면
+
+1. 해당 세그먼트 위험 점수 갱신
+2. 경로 위험 점수 재계산
+3. 사용자 경로 추천 업데이트
+
+---
+
+# System Architecture
 
 ```
-Client (Web / App)
+Frontend (React)
         ↓
-Map API Layer
+Naver Map API
+        ↓
+Backend API (FastAPI)
         ↓
 Risk Processing Service
         ↓
 Safety Scoring Engine
         ↓
-MySQL Database
+PostgreSQL + PostGIS
         ↓
-AI Image Classification Module
+Routing Engine (OSRM)
+        ↓
+Scheduler / Worker
 ```
-
-### 구성 요소 설명
-
-* Client: 지도 UI, 신고 UI, 경로 선택 인터페이스
-* Map API Layer: 도로 네트워크 및 기본 경로 탐색
-* Risk Processing Service: 신고 데이터 정규화 및 세그먼트 매핑
-* Safety Scoring Engine: 구간 및 경로 위험 점수 계산
-* Database: 세그먼트, 신고, 시설 상태 데이터 저장
-* AI Module: 업로드 이미지 위험 유형 자동 분류 보조
 
 ---
 
-## 4. Data Pipeline Design
+# Tech Stack
 
-### 4.1 도로 세그먼트 분할
+## Frontend
 
-* 지도 API 기반 도로 네트워크 수집
-* 경로 단위를 세그먼트 단위로 분할
+* React
+* Vite
+* Tailwind CSS
+* Naver Map JavaScript API
 
-### 4.2 경사도 계산
+---
 
-* 수치표고모델(DEM) 기반 고도 정보 추출
-* 세그먼트 시작/종점 고도 차 계산
-* 평균 경사도 산출 및 정규화
+## Backend
 
-### 4.3 시민 신고 데이터 적재
+* FastAPI
+* Python
+
+역할
+
+* 위험 데이터 처리
+* 세그먼트 매핑
+* 안전 점수 계산
+* 경로 요청 처리
+
+---
+
+## Database
+
+* PostgreSQL
+* PostGIS
+
+기능
+
+* 공간 데이터 저장
+* 세그먼트 기반 위험 관리
+* bbox 기반 지도 조회
+
+---
+
+## Routing
+
+* OpenStreetMap
+* OSRM
+
+역할
+
+* 도보 경로 계산
+* 경로 후보 생성
+* SafeWalk 안전 점수 기반 경로 선택
+
+---
+
+## Data Processing
+
+* DEM (GeoTIFF 기반 고도 데이터)
+* Python GIS Processing
+
+---
+
+## Worker
+
+MVP
+
+* APScheduler
+
+확장
+
+* Redis
+* Celery
+
+---
+
+# Safety Scoring Model
+
+SafeWalk는 **구간 단위 위험 점수 모델**을 사용한다.
+
+### Segment Score
+
+```
+SegmentScore =
+  (SlopeWeight × NormalizedSlope) +
+  (ObstacleWeight × ObstacleCount) +
+  (FacilityPenalty × FacilityFailure) +
+  (RecentReportWeight × RecentReportFrequency)
+```
+
+설계 기준
+
+* 경사도는 0~1 범위로 정규화
+* 최근 신고 데이터는 시간 감쇠 가중치 적용
+* 시설 고장은 높은 패널티 적용
+
+---
+
+### Route Score
+
+```
+RouteScore = Σ (SegmentScore × SegmentLength)
+```
+
+사용자는 다음 옵션을 선택할 수 있다.
+
+* 최단 거리
+* 최소 경사
+* 최안전 경로
+
+---
+
+# Data Pipeline
+
+### 1. 도로 네트워크 수집
+
+OpenStreetMap 기반 도로 데이터 수집
+
+---
+
+### 2. 도로 세그먼트 분할
+
+도로를 일정 길이의 **Segment 단위로 분할**
+
+---
+
+### 3. 경사 계산
+
+DEM 기반 고도 차이를 이용하여
+
+```
+Slope = elevation_difference / segment_length
+```
+
+---
+
+### 4. 시민 신고 데이터 수집
+
+수집 데이터
 
 * 위치 좌표
 * 위험 유형
 * 이미지
 * 신고 시간
 
-### 4.4 세그먼트 매핑
+---
 
-* 신고 좌표 → 최근접 세그먼트 매핑
-* 해당 세그먼트 위험 점수 갱신
+### 5. 세그먼트 매핑
 
-### 4.5 점수 재계산
+신고 좌표를 **최근접 도로 세그먼트에 매핑**
 
-* 세그먼트 점수 재산출
+---
+
+### 6. 위험 점수 업데이트
+
+새 신고 발생 시
+
+* 세그먼트 위험 점수 업데이트
 * 경로 점수 재계산
-* 사용자에게 업데이트된 경로 제공
 
 ---
 
-## 5. Safety Scoring Model
+# Installation
 
-### 5.1 Segment Score
-
-```
-SegmentScore =
-  (SlopeWeight × NormalizedSlope) +
-  (ObstacleWeight × ObstacleCount) +
-  (FacilityPenalty × ElevatorFailure) +
-  (RecentReportWeight × RecentReportFrequency)
+```bash
+git clone https://github.com/your-repo/safewalk
+cd safewalk
 ```
 
-### 설계 기준
+### Backend
 
-* 경사도는 0~1 범위로 정규화
-* 최근 신고 데이터는 시간 감쇠 가중치 적용
-* 시설 고장은 높은 패널티 부여
-* 위험 유형별 가중치 차등 적용
+```bash
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
 
 ---
 
-### 5.2 Route Score
+### Frontend
 
-```
-RouteScore = Σ (SegmentScore × SegmentLengthWeight)
+```bash
+npm install
+npm run dev
 ```
 
-사용자는 다음 경로 옵션을 선택할 수 있다.
+---
+
+# Usage
+
+1️⃣ 웹 페이지 접속
+2️⃣ 출발지 / 목적지 입력
+3️⃣ 경로 옵션 선택
 
 * 최단 거리
-* 최저 경사
+* 최소 경사
 * 최안전 경로
 
----
-
-## 6. Database Schema (Conceptual)
-
-### Segment
-
-* segment_id (PK)
-* start_lat
-* start_lng
-* end_lat
-* end_lng
-* slope
-* risk_score
-
-### RiskReport
-
-* report_id (PK)
-* segment_id (FK)
-* risk_type
-* image_url
-* created_at
-
-### FacilityStatus
-
-* facility_id
-* location
-* status
-* last_updated
+4️⃣ 지도에서 위험 구간 확인 가능
 
 ---
 
-## 7. Technology Stack
+# Project Structure
 
-Backend
-
-* Spring Boot
-* REST API
-
-Database
-
-* MySQL
-
-Mapping
-
-* Naver Map API 또는 Kakao Map API
-
-GIS
-
-* DEM (GeoTIFF 기반 고도 데이터)
-
-AI
-
-* CNN 기반 이미지 분류 모델
-
-Algorithm
-
-* 가중치 기반 위험 점수 모델
+```
+safewalk
+ ├ frontend
+ │   ├ components
+ │   ├ pages
+ │   └ map
+ │
+ ├ backend
+ │   ├ api
+ │   ├ services
+ │   ├ models
+ │   ├ scoring
+ │   └ routing
+ │
+ ├ worker
+ │
+ └ data
+     ├ dem
+     └ osm
+```
 
 ---
 
-## 8. Differentiation
+# Roadmap
 
-| 항목     | 기존 지도 서비스 | SafeWalk |
-| ------ | --------- | -------- |
-| 경로 기준  | 최단거리 중심   | 안전 점수 기반 |
-| 위험 데이터 | 없음        | 시민 참여 기반 |
-| 경사 반영  | 제한적       | 적극 반영    |
-| 실시간 반영 | 낮음        | 신고 즉시 반영 |
-| 주요 대상  | 일반 사용자    | 교통약자 중심  |
+MVP
 
-핵심 차별점은 경로의 기준을 “속도”가 아닌 “안전”으로 재정의한 점이다.
+* 시민 신고 기능
+* 경사도 계산
+* 위험 점수 기반 경로 추천
 
----
+Next
 
-## 9. Limitations and Future Work
-
-초기 데이터 부족 문제
-
-* 특정 지역 파일럿 운영을 통해 데이터 축적
-
-신고 데이터 신뢰성 문제
-
-* 다중 신고 기반 신뢰 점수 모델 도입
-
-가중치 최적화 문제
-
-* 향후 머신러닝 기반 가중치 자동 학습 적용
+* AI 이미지 위험 분류
+* 신고 신뢰도 모델
+* 머신러닝 기반 가중치 최적화
 
 ---
 
-## 10. Project Significance
+# Contributors
 
-SafeWalk는 단순 경로 추천 애플리케이션이 아니라
-도시 보행 안전을 데이터로 구조화하려는 시도이다.
-
-교통약자의 이동권을
-정량적 위험 점수 모델과 실시간 데이터 반영 구조로 재정의한다.
-
-이 프로젝트는 다음 역량을 보여준다.
-
-* 구간 단위 위험 점수 모델 설계
-* GIS 기반 경사도 처리 설계
-* 실시간 데이터 반영 아키텍처 설계
-* 시민 참여 데이터 구조화
-* 확장 가능한 스마트시티 연계 구조 고려
+Team SafeWalk
 
 ---
 
-필요하면 다음 단계로 더 고급화할 수 있다.
+# License
 
-* ERD 상세 설계
-* 실제 구현 기준 API 명세서
-* DEM 처리 구체 알고리즘 설명
-* 세그먼트 매핑 수학적 접근 설명
-* 성능 최적화 전략 추가
+MIT License
+
+---
